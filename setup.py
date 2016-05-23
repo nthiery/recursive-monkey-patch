@@ -30,7 +30,7 @@ setup(
         'Topic :: Software Development :: Build Tools',
         'License :: OSI Approved :: GNU General Public License (GPL)', # TODO Update for GPL v3
         'Programming Language :: Python :: 2',
-        #'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3',
     ],
     keywords='packaging development',
     py_modules=["recursive_monkey_patch"],
