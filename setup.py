@@ -22,19 +22,18 @@ setup(
     url='https://github.com/nthiery/recursive-monkey-patch',
     author='Nicolas M. Thiéry',
     author_email='nthiery@users.sf.net',
-    license='GPLv3',
+    license='GPLv2+',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
-        'Intended Audience :: Science/Research'
+        'Intended Audience :: Science/Research',
         'Topic :: Software Development :: Build Tools',
-        'License :: OSI Approved :: GNU General Public License (GPL)', # TODO Update for GPL v3
+        'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 3',
     ],
     keywords='packaging development',
     py_modules=["recursive_monkey_patch"],
-
     setup_requires=['pytest-runner'],
     tests_require=['pytest'],
 )
