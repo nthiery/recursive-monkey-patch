@@ -12,8 +12,16 @@ Recursive monkey patching
 #                  http://www.gnu.org/licenses/
 #*****************************************************************************
 
+from __future__ import print_function
 import pkgutil
-from types import ModuleType, ClassType
+import sys
+from types import ModuleType
+# Python 2/3 compatibility: we will want TypeType to match both old and new style classes
+try:
+    from types import ClassType
+    TypeType = (type, ClassType)
+except:
+    TypeType = type
 
 # Detect whether the SageMath librar is in the path, and if so import
 # some classes that require special handling
@@ -42,7 +50,7 @@ def monkey_patch(source, target, verbose=False):
 
         >>> from recursive_monkey_patch import monkey_patch
 
-        >>> class A(object):
+        >>> class A:
         ...     "The class A"
         ...     def f(self):
         ...         return "calling A.f"
@@ -50,7 +58,7 @@ def monkey_patch(source, target, verbose=False):
         ...         return "calling A.g"
         ...     class Nested:
         ...         "The class A.Nested"
-        ...     class Nested2:
+        ...     class Nested2(object):
         ...         "The class A.Nested2"
 
         >>> a = A()
@@ -64,11 +72,11 @@ def monkey_patch(source, target, verbose=False):
         ...     def f(self):
         ...         return "calling AMonkeyPatch.f"
         ...     class Nested:
-        ...         "The class AMonkeyPatch.Nested"
         ...         def f(self):
         ...             return "calling AMonkeyPatch.Nested.f"
         ...         x = 1
         ...     class Nested2:
+        ...         "The class AMonkeyPatch.Nested2"
         ...         pass
         ...     class Nested3:
         ...         pass
@@ -110,35 +118,33 @@ def monkey_patch(source, target, verbose=False):
 
     For example, the original module name of a class is preserved::
 
-        >>> class source:
+        >>> class source(object):
         ...    __module__ = 'source_module'
-        >>> class target:
+        >>> class target(object):
         ...    __module__ = 'target_module'
         >>> target
-        <class target_module.target at ...>
+        <class 'target_module.target'>
         >>> monkey_patch(source, target)
         >>> target
-        <class target_module.target at ...>
+        <class 'target_module.target'>
 
-    Existing Documentation is copied over, but not for new style
-    classes::
+    Existing documentation is copied over::
 
         >>> A.__doc__
-        'The class A'
+        'The class AMonkeyPatch'
         >>> A.Nested.__doc__
-        'The class AMonkeyPatch.Nested'
-        >>> A.Nested2.__doc__
-        'The class A.Nested2'
+        'The class A.Nested'
 
-    This is because ``__doc__`` is read only for those::
+    except for new style classes, in Python 2::
 
-        >>> A.__doc__ = "foo"
-        Traceback (most recent call last):
-        ...
-        AttributeError: attribute '__doc__' of 'type' objects is not writable
+        >>> import sys
+        >>> A.Nested2.__doc__ == ('The class A.Nested2' if sys.version_info.major == 2 else 'The class AMonkeyPatch.Nested2')
+        True
+
+    This is because the attribute ``__doc__`` is read only for those.
     """
     if verbose:
-        print "Monkey patching %s into %s"%(source.__name__, target.__name__)
+        print("Monkey patching %s into %s"%(source.__name__, target.__name__), file=stderr)
     if isinstance(source, ModuleType):
         assert isinstance(target, ModuleType)
         if hasattr(source, "__path__"):
@@ -151,27 +157,31 @@ def monkey_patch(source, target, verbose=False):
                     assert isinstance(subtarget, (type, ModuleType))
                     monkey_patch(subsource, subtarget, verbose=verbose)
 
-    for (key, subsource) in source.__dict__.iteritems():
+    for (key, subsource) in source.__dict__.items():
         if isinstance(source, ModuleType) and \
            not (hasattr(subsource, "__module__") and subsource.__module__ == source.__name__):
             continue
-        if isinstance(subsource, (type, ClassType)) and key in target.__dict__:
+        if isinstance(subsource, (type, TypeType)) and key in target.__dict__:
             # Recurse into class
             subtarget = target.__dict__[key]
-            assert isinstance(subtarget, (type, ClassType))
+            assert isinstance(subtarget, (type, TypeType))
             monkey_patch(subsource, subtarget, verbose=verbose)
             continue
 
         if verbose:
-            print "Handling attribute %s"%(key)
+            print("Handling attribute %s"%(key), file=stderr)
 
-        # Don't override the module name of the target
-        if key == "__module__":
+        # Skip unrelevant technical entries
+        # In particular, don't override the module name of the target
+        if key in ['__module__', '__dict__', '__weakref__']:
             continue
-        # Don't override existing documentation with undefined documentation,
-        # or when the target is a new style class (setting __doc__ is not allowed)
-        if key == "__doc__" and (subsource is None or isinstance(target, type)):
-            continue
+        if key == "__doc__":
+            # Don't override existing documentation with undefined documentation,
+            if subsource is None:
+                continue
+            # New style classes in Python 2 don't support __doc__ assignment, so skip those
+            if sys.version_info.major == 2 and isinstance(target, type):
+                continue
         setattr(target, key, subsource)
 
     ##########################################################################
