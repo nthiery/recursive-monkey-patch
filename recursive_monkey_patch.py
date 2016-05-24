@@ -12,7 +12,8 @@ Recursive monkey patching
 #                  http://www.gnu.org/licenses/
 #*****************************************************************************
 
-from __future__ import print_function
+import logging
+import importlib
 import pkgutil
 import sys
 from types import ModuleType
@@ -32,34 +33,40 @@ try:
 except:
     pass
 
-def monkey_patch(source, target, verbose=False):
+def full_name(t):
+    if isinstance(t, ModuleType):
+        return t.__name__
+    else:
+        return t.__module__+"."+t.__name__
+
+def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
     """
     Monkey patch recursively ``source`` into ``target``.
 
     INPUT:
 
     - ``source``, ``target`` -- modules or classes
-    - ``verbose`` -- a boolean (default: False)
+    - ``log_level`` -- a :mod:`logging` level (default: logging.warning)
+    - ``logger`` -- a :class:`logging.Logger` (default: None): for internal use
 
     This recurses through the (sub)modules and (nested) classes of
-    ``source``; if a module or class that does not appear at the
-    corresponding location in ``target``, then it is copied other. Any
-    function, method or class/module attribute is copied over.
+    ``source``; if a (sub)module or (nested) class that does not
+    appear at the corresponding location in ``target``, then it is
+    copied other. Except for a few special attributes, any function,
+    method, or class attribute is copied over, overwriting the
+    original content.
 
     EXAMPLES::
 
         >>> from recursive_monkey_patch import monkey_patch
 
         >>> class A:
-        ...     "The class A"
         ...     def f(self):
         ...         return "calling A.f"
         ...     def g(self):
         ...         return "calling A.g"
         ...     class Nested:
-        ...         "The class A.Nested"
-        ...     class Nested2(object):
-        ...         "The class A.Nested2"
+        ...         pass
 
         >>> a = A()
         >>> a.f()
@@ -68,7 +75,6 @@ def monkey_patch(source, target, verbose=False):
         'calling A.g'
 
         >>> class AMonkeyPatch:
-        ...     "The class AMonkeyPatch"
         ...     def f(self):
         ...         return "calling AMonkeyPatch.f"
         ...     class Nested:
@@ -76,9 +82,6 @@ def monkey_patch(source, target, verbose=False):
         ...             return "calling AMonkeyPatch.Nested.f"
         ...         x = 1
         ...     class Nested2:
-        ...         "The class AMonkeyPatch.Nested2"
-        ...         pass
-        ...     class Nested3:
         ...         pass
 
         >>> monkey_patch(AMonkeyPatch, A)
@@ -103,73 +106,128 @@ def monkey_patch(source, target, verbose=False):
         >>> a_nested.x
         1
 
-    The class ``AMonkeyPatch.Nested3`` that did not exist in ``A`` is
+    The class ``AMonkeyPatch.Nested2`` that did not exist in ``A`` is
     copied over::
 
-        >>> A.Nested3 is AMonkeyPatch.Nested3
+        >>> A.Nested2 is AMonkeyPatch.Nested2
         True
 
-    Unlike  ``AMonkeyPatch.Nested2``::
+    Unlike ``AMonkeyPatch.Nested`` which is just patched::
 
-        >>> A.Nested2 is AMonkeyPatch.Nested2
+        >>> A.Nested is AMonkeyPatch.Nested
         False
 
-    Special cases: some special attributes are not copied over.
 
-    For example, the original module name of a class is preserved::
+    We now exercise a typical use case, where an existing module is
+    recursively monkey patched from a sibbling module::
 
-        >>> class source(object):
-        ...    __module__ = 'source_module'
-        >>> class target(object):
-        ...    __module__ = 'target_module'
-        >>> target
-        <class 'target_module.target'>
-        >>> monkey_patch(source, target)
-        >>> target
-        <class 'target_module.target'>
+        >>> import a_test_module
+        >>> dir(a_test_module.submodule)
+        ['A', '__builtins__', ...]
 
-    Existing documentation is copied over::
+        >>> import a_test_module_patch
 
-        >>> A.__doc__
-        'The class AMonkeyPatch'
-        >>> A.Nested.__doc__
-        'The class A.Nested'
-
-    except for new style classes, in Python 2::
+    Little digression which is not needed in normal operation; here we
+    want to log information on standard output for testing purposes::
 
         >>> import sys
-        >>> A.Nested2.__doc__ == ('The class A.Nested2' if sys.version_info.major == 2 else 'The class AMonkeyPatch.Nested2')
+        >>> import logging
+        >>> logger = logging.Logger("monkey_patch.test", level=logging.INFO)
+        >>> logger.addHandler(logging.StreamHandler(sys.stdout))
+
+    Let's monkey patch::
+
+        >>> monkey_patch(a_test_module_patch, a_test_module, logger=logger)
+        Monkey patching a_test_module.submodule.A.NestedNew
+        Monkey patching a_test_module.submodule.A.__doc__
+        Monkey patching a_test_module.submodule.B
+        Monkey patching a_test_module.submodule_new
+
+        >>> dir(a_test_module.submodule)
+        ['A', 'B', '__builtins__', ...]
+
+    .. RUBRIC:: Testing the handling of special attributes
+
+    As for other attributes, documentation is copied over::
+
+        >>> from a_test_module.submodule import A
+        >>> A.__doc__
+        'A (patched)'
+
+    except for new style classes, in Python 2, because the attribute
+    ``__doc__`` is read only for those::
+
+        >>> class B(object):
+        ...      "B (original)"
+        >>> class B_patch(object):
+        ...      "B (patched)"
+        >>> monkey_patch(B_patch, B)
+        >>> B.__doc__ == ('B (original)' if sys.version_info.major == 2 else 'B (patched)')
         True
 
-    This is because the attribute ``__doc__`` is read only for those.
+    Unpatched documentation is not deleted when no documentation is
+    specified in the patch::
+
+        >>> A.Nested.__doc__
+        'A.Nested'
+
+    Some special attributes are not copied over. For example, the
+    original module name of a class is preserved::
+
+        >>> A.__module__
+        'a_test_module.submodule'
+
+    Of course, classes that are copied over as is have their module
+    defined appropriately::
+
+        >>> A.NestedNew.__module__
+        'a_test_module_patch.submodule'
     """
-    if verbose:
-        print("Monkey patching %s into %s"%(source.__name__, target.__name__), file=stderr)
+    if logger is None:
+        logger = logging.Logger("monkey_patch."+source.__name__, level=log_level)
+        logger.addHandler(logging.StreamHandler(sys.stderr))
+    logger.debug("Monkey patching {} into {}".format(source.__name__, target.__name__))
+
     if isinstance(source, ModuleType):
         assert isinstance(target, ModuleType)
         if hasattr(source, "__path__"):
-            # Recurse into package
-            for (module_loader, name, ispkg) in pkgutil.iter_modules(path=source.__path__, prefix=source.__name__+"."):
-                subsource = module_loader.find_module(name).load_module(name)
-                short_name = name.split('.')[-1]
-                if short_name in target.__dict__:
-                    subtarget = target.__dict__[short_name]
-                    assert isinstance(subtarget, (type, ModuleType))
-                    monkey_patch(subsource, subtarget, verbose=verbose)
+            # Force loading all submodules
+            for (module_loader, name, ispkg) in pkgutil.iter_modules(path=source.__path__):
+                subsource = importlib.import_module(source.__name__+"."+name)
+                setattr(source, name, subsource)
 
     for (key, subsource) in source.__dict__.items():
-        if isinstance(source, ModuleType) and \
-           not (hasattr(subsource, "__module__") and subsource.__module__ == source.__name__):
-            continue
+        logger.debug("Considering {}.{}".format(source, key))
+        if isinstance(source, ModuleType):
+            # If the source is a module, ignore all entries that are not defined in this module
+            # Any better test for this?
+            # At this point, all constants are ignored because we
+            # don't know how to test whether they have been defined or
+            # imported in this module
+            if isinstance(subsource, ModuleType):
+                if not subsource.__name__.startswith(source.__name__):
+                    continue
+            else:
+                if not (hasattr(subsource, '__module__') and subsource.__module__ == source.__name__):
+                    continue
+
+        if isinstance(subsource, ModuleType):
+            logger.debug("Examining submodule: {}".format(key))
+            try:
+                subtarget = importlib.import_module(target.__name__+"."+key)
+                assert isinstance(subtarget, (type, ModuleType))
+                logger.debug("Recursing into preexisting submodule of the target")
+                monkey_patch(subsource, subtarget, logger=logger)
+                continue
+            except ImportError:
+                pass
+
         if isinstance(subsource, (type, TypeType)) and key in target.__dict__:
-            # Recurse into class
+            # Recurse into a class which already exists in the target
             subtarget = target.__dict__[key]
             assert isinstance(subtarget, (type, TypeType))
-            monkey_patch(subsource, subtarget, verbose=verbose)
+            monkey_patch(subsource, subtarget, logger=logger)
             continue
-
-        if verbose:
-            print("Handling attribute %s"%(key), file=stderr)
 
         # Skip unrelevant technical entries
         # In particular, don't override the module name of the target
@@ -182,6 +240,7 @@ def monkey_patch(source, target, verbose=False):
             # New style classes in Python 2 don't support __doc__ assignment, so skip those
             if sys.version_info.major == 2 and isinstance(target, type):
                 continue
+        logger.info("Monkey patching {}.{}".format(full_name(target), key))
         setattr(target, key, subsource)
 
     ##########################################################################
@@ -209,5 +268,5 @@ def monkey_patch(source, target, verbose=False):
                                       ("MorphismMethods", "morphism_class"),
                                       ("SubcategoryMethods", "subcategory_class")):
             if cls_key in source.__dict__:
-                monkey_patch(source.__dict__[cls_key], getattr(category, category_key), verbose=verbose)
+                monkey_patch(source.__dict__[cls_key], getattr(category, category_key), logger=logger)
 
