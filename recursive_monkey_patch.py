@@ -196,7 +196,10 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
                 subsource = importlib.import_module(source.__name__+"."+name)
                 setattr(source, name, subsource)
 
-    for (key, subsource) in source.__dict__.items():
+    # The sorting is just to have a reproducible log
+    # It could be easily removed if performance would call for it
+    for key in sorted(source.__dict__.keys()):
+        subsource = source.__dict__[key]
         logger.debug("Considering {}.{}".format(source, key))
         if isinstance(source, ModuleType):
             # If the source is a module, ignore all entries that are not defined in this module
