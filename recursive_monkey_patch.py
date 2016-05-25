@@ -56,9 +56,10 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
     method, or class attribute is copied over, overwriting the
     original content.
 
-    EXAMPLES::
+    EXAMPLES:
 
-        >>> from recursive_monkey_patch import monkey_patch
+    We start with a small example where we use a patching class
+    `AMonkeyPatch` to extend an existing class `A`::
 
         >>> class A:
         ...     def f(self):
@@ -67,7 +68,6 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
         ...         return "calling A.g"
         ...     class Nested:
         ...         pass
-
         >>> a = A()
         >>> a.f()
         'calling A.f'
@@ -84,7 +84,13 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
         ...     class Nested2:
         ...         pass
 
+    We recursively monkey patch the features from `AMonkeyPatch` into `A`::
+
+        >>> from recursive_monkey_patch import monkey_patch
         >>> monkey_patch(AMonkeyPatch, A)
+
+    Now, all the features implemented in `AMonkeyPatch` are available
+    for instances of `A` and its nested classes::
 
         >>> a.f()
         'calling AMonkeyPatch.f'
@@ -106,36 +112,43 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
         >>> a_nested.x
         1
 
-    The class ``AMonkeyPatch.Nested2`` that did not exist in ``A`` is
-    copied over::
+    .. NOTE::
 
-        >>> A.Nested2 is AMonkeyPatch.Nested2
-        True
+        The class ``AMonkeyPatch.Nested2`` that did not exist in ``A`` is
+        copied over::
 
-    Unlike ``AMonkeyPatch.Nested`` which is just patched::
+            >>> A.Nested2 is AMonkeyPatch.Nested2
+            True
 
-        >>> A.Nested is AMonkeyPatch.Nested
-        False
+        Unlike ``AMonkeyPatch.Nested`` which is just patched::
 
+            >>> A.Nested is AMonkeyPatch.Nested
+            False
 
-    We now exercise a typical use case, where an existing module is
-    recursively monkey patched from a sibbling module::
+    .. RUBRIC:: Recursively monkey patching modules and packages
+
+    We now demonstrate a typical use case, where we use a patching
+    module to extend the features of an existing module::
 
         >>> import a_test_module
         >>> dir(a_test_module.submodule)
         ['A', '__builtins__', ...]
 
         >>> import a_test_module_patch
+        >>> dir(a_test_module_patch.submodule)
+        ['A', 'B', '__builtins__', ...]
 
-    Little digression which is not needed in normal operation; here we
-    want to log information on standard output for testing purposes::
+    The following little digression is not needed in normal operation.
+    Here we want to log information on standard output for
+    demonstration and testing purposes::
 
         >>> import sys
         >>> import logging
         >>> logger = logging.Logger("monkey_patch.test", level=logging.INFO)
         >>> logger.addHandler(logging.StreamHandler(sys.stdout))
 
-    Let's monkey patch::
+    We now recursively monkey patch the features of
+    ``a_test_module_patch`` into ``a_test_module``::
 
         >>> monkey_patch(a_test_module_patch, a_test_module, logger=logger)
         Monkey patching a_test_module.submodule.A.NestedNew
@@ -145,6 +158,17 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
 
         >>> dir(a_test_module.submodule)
         ['A', 'B', '__builtins__', ...]
+
+    .. RUBRIC:: Automatizing the monkey patching
+
+    A typical idiom is to put the :func:`monkey_patch` call in the
+    patching module initialization (see the code of
+    :mod:`a_test_module2.__init__` for an example). Then the user only
+    has to import the patching module::
+
+        >>> import a_test_module_patch2
+        >>> dir(a_test_module.submodule)
+        ['A', 'B', 'C', '__builtins__', ...]
 
     .. RUBRIC:: Testing the handling of special attributes
 
