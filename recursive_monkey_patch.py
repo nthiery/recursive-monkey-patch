@@ -297,3 +297,5 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
             if cls_key in source.__dict__:
                 monkey_patch(source.__dict__[cls_key], getattr(category, category_key), logger=logger)
 
+    if "_monkey_patch_hook" in target.__dict__:
+        target._monkey_patch_hook(source)
