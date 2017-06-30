@@ -242,12 +242,13 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
             logger.debug("Examining submodule: {}".format(key))
             try:
                 subtarget = importlib.import_module(target.__name__+"."+key)
+            except ImportError:
+                pass
+            else:
                 assert isinstance(subtarget, (type, ModuleType))
                 logger.debug("Recursing into preexisting submodule of the target")
                 monkey_patch(subsource, subtarget, logger=logger)
                 continue
-            except ImportError:
-                pass
 
         if isinstance(subsource, (type, TypeType)) and key in target.__dict__:
             # Recurse into a class which already exists in the target
