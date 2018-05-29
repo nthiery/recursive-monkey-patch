@@ -4,6 +4,7 @@ Recursive monkey patching
 """
 #*****************************************************************************
 #  Copyright (C) 2013-2016 Nicolas M. Thiéry <nthiery at users.sf.net>
+#                     2018 Julian Rüth <julian.rueth@fsfe.org>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -154,10 +155,11 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
         Monkey patching a_test_module.submodule.A.NestedNew
         Monkey patching a_test_module.submodule.A.__doc__
         Monkey patching a_test_module.submodule.B
-        Monkey patching a_test_module.submodule_new
 
         >>> dir(a_test_module.submodule)
         ['A', 'B', '__builtins__', ...]
+        >>> dir(a_test_module.submodule_new)
+        ['__builtins__', ...]
 
     .. RUBRIC:: Automatizing the monkey patching
 
@@ -206,6 +208,14 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
 
         >>> A.NestedNew.__module__
         'a_test_module_patch.submodule'
+
+    .. RUBRIC:: Testing that new modules behave like old modules
+
+    The new modules can be imported (actually they are already imported)::
+
+        >>> import a_test_module.submodule_new
+        >>> from a_test_module.submodule_new import i
+
     """
     if logger is None:
         logger = logging.Logger("monkey_patch."+source.__name__, level=log_level)
@@ -217,7 +227,19 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
         if hasattr(source, "__path__"):
             # Force loading all submodules
             for (module_loader, name, ispkg) in pkgutil.iter_modules(path=source.__path__):
-                subsource = importlib.import_module(source.__name__+"."+name)
+                try:
+                    importlib.import_module(target.__name__+"."+name)
+                except ImportError:
+                    # if there is no target.name submodule, then import
+                    # source.name as if it was called target.name
+                    sys.modules[target.__name__] = source
+                    try:
+                        subsource = importlib.import_module("."+name, target.__name__)
+                        setattr(target, name, subsource)
+                    finally:
+                        sys.modules[target.__name__] = target
+                else:
+                    subsource = importlib.import_module(source.__name__ +"."+name)
                 setattr(source, name, subsource)
 
     # The sorting is just to have a reproducible log
@@ -240,15 +262,12 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
 
         if isinstance(subsource, ModuleType):
             logger.debug("Examining submodule: {}".format(key))
-            try:
-                subtarget = importlib.import_module(target.__name__+"."+key)
-            except ImportError:
-                pass
-            else:
+            subtarget = importlib.import_module(target.__name__+"."+key)
+            if subtarget is not subsource:
                 assert isinstance(subtarget, (type, ModuleType))
                 logger.debug("Recursing into preexisting submodule of the target")
                 monkey_patch(subsource, subtarget, logger=logger)
-                continue
+            continue
 
         if isinstance(subsource, (type, TypeType)) and key in target.__dict__:
             # Recurse into a class which already exists in the target
