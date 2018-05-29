@@ -19,7 +19,7 @@ recursively monkey patch the ``bar`` package. Let's assume for example
 that we are writing a package ``bar-foo`` that requires the addition
 of a method ``f`` to the class ``bar.x.y.z.Z``.
 
-To achieve this, one writes a module ``sage_foo.x.y.z.Z`` containing a
+To achieve this, one writes a module ``foo.x.y.z.Z`` containing a
 dummy ``Z`` class::
 
     class Z:
