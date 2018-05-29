@@ -55,3 +55,8 @@ ToDo
 
 - Support for lazy imports
 - Where is the natural place for running ``monkey_patch` in a package?
+
+Related tools
+-------------
+
+- [patchy](https://github.com/adamchainz/patchy): runtime application of source patches at the granularity of functions
