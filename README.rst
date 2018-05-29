@@ -59,4 +59,5 @@ ToDo
 Related tools
 -------------
 
-- [patchy](https://github.com/adamchainz/patchy): runtime application of source patches at the granularity of functions
+- `patchy <https://github.com/adamchainz/patchy>`_: runtime application of source patches at the granularity of functions
+- `unittest.mock.patch <https://docs.python.org/3/library/unittest.mock.html#unittest.mock.patch>`_: temporary runtime monkey patching of functions; meant primarily for testing purposes 
