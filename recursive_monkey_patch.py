@@ -52,7 +52,7 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
     This recurses through the (sub)modules and (nested) classes of
     ``source``; if a (sub)module or (nested) class that does not
     appear at the corresponding location in ``target``, then it is
-    copied other. Except for a few special attributes, any function,
+    copied over. Except for a few special attributes, any function,
     method, or class attribute is copied over, overwriting the
     original content.
 
