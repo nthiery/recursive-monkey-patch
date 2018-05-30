@@ -53,7 +53,7 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
     This recurses through the (sub)modules and (nested) classes of
     ``source``; if a (sub)module or (nested) class that does not
     appear at the corresponding location in ``target``, then it is
-    copied other. Except for a few special attributes, any function,
+    copied over. Except for a few special attributes, any function,
     method, or class attribute is copied over, overwriting the
     original content.
 
@@ -223,7 +223,8 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
     logger.debug("Monkey patching {} into {}".format(source.__name__, target.__name__))
 
     if isinstance(source, ModuleType):
-        assert isinstance(target, ModuleType)
+        if not isinstance(target, ModuleType):
+            raise TypeError("target must be a module but %r is a %s"%(target, type(target)))
         if hasattr(source, "__path__"):
             # Force loading all submodules
             for (module_loader, name, ispkg) in pkgutil.iter_modules(path=source.__path__):
@@ -264,7 +265,8 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
             logger.debug("Examining submodule: {}".format(key))
             subtarget = importlib.import_module(target.__name__+"."+key)
             if subtarget is not subsource:
-                assert isinstance(subtarget, (type, ModuleType))
+                if not isinstance(subtarget, (type, ModuleType)):
+                    raise TypeError("%s.%s must be a module but it is a %s"%(target.__name__, key, type(subtarget)))
                 logger.debug("Recursing into preexisting submodule of the target")
                 monkey_patch(subsource, subtarget, logger=logger)
             continue
@@ -272,7 +274,8 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
         if isinstance(subsource, (type, TypeType)) and key in target.__dict__:
             # Recurse into a class which already exists in the target
             subtarget = target.__dict__[key]
-            assert isinstance(subtarget, (type, TypeType))
+            if not isinstance(subtarget, (type, TypeType)):
+                raise TypeError("expected '%s' to be a type in the target but it is a %s"%(key, type(subtarget)))
             monkey_patch(subsource, subtarget, logger=logger)
             continue
 
