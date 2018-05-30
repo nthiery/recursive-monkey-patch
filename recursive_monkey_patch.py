@@ -209,7 +209,7 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
         >>> A.NestedNew.__module__
         'a_test_module_patch.submodule'
 
-    .. RUBRIC:: Testing that new modules behave like old modules
+    .. RUBRIC:: Testing that new modules behave like preexisting modules
 
     The new modules can be imported (actually they are already imported)::
 
