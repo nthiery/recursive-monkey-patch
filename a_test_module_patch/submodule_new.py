@@ -1,1 +1,2 @@
-i = 1337
+class New:
+    pass

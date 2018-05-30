@@ -159,7 +159,7 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
         >>> dir(a_test_module.submodule)
         ['A', 'B', '__builtins__', ...]
         >>> dir(a_test_module.submodule_new)
-        ['__builtins__', ...]
+        ['New', '__builtins__', ...]
 
     .. RUBRIC:: Automatizing the monkey patching
 
@@ -214,7 +214,23 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
     The new modules can be imported (actually they are already imported)::
 
         >>> import a_test_module.submodule_new
-        >>> from a_test_module.submodule_new import i
+        >>> from a_test_module.submodule_new import New
+        >>> New.__module__
+        'a_test_module.submodule_new'
+
+    The patch modules can also be imported explicitly::
+
+        >>> import a_test_module_patch.submodule_new
+        >>> from a_test_module_patch.submodule_new import New as New_
+        >>> New_.__module__
+        'a_test_module_patch.submodule_new'
+
+    Note that there are two instances of the ``New`` type now, so you probably
+    don't want to explicitly import submodules of the source module (but it is
+    fine to use relative imports within the source modules)::
+
+        >>> New_ is New
+        False
 
     """
     if logger is None:
