@@ -222,15 +222,14 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
 
         >>> import a_test_module_patch.submodule_new
         >>> from a_test_module_patch.submodule_new import New as New_
+
+    Note that types impported from the patch pretend to come from a different
+    package::
+
         >>> New_.__module__
-        'a_test_module_patch.submodule_new'
-
-    Note that there are two instances of the ``New`` type now, so you probably
-    don't want to explicitly import submodules of the source module (but it is
-    fine to use relative imports within the source modules)::
-
+        'a_test_module.submodule_new'
         >>> New_ is New
-        False
+        True
 
     """
     if logger is None:
@@ -253,6 +252,7 @@ def monkey_patch(source, target, log_level=logging.WARNING, logger=None):
                     try:
                         subsource = importlib.import_module("."+name, target.__name__)
                         setattr(target, name, subsource)
+                        sys.modules[source.__name__+"."+name] = subsource
                     finally:
                         sys.modules[target.__name__] = target
                 else:
