@@ -1,7 +1,10 @@
-from __future__ import absolute_import
-from . import a_test_module as patch
-import a_test_module
+"""
+Typical idiom to automatize the monkey patching
 
+Importing this module triggers the monkey patching of its features into a_test_module.
+"""
+
+import sys
 from recursive_monkey_patch import monkey_patch
-monkey_patch(patch, a_test_module)
-
+import a_test_module
+monkey_patch(sys.modules[__name__], a_test_module)
