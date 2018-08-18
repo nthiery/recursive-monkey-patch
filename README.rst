@@ -1,6 +1,9 @@
 Recursive monkey patching for Python
 ====================================
 
+.. image:: https://travis-ci.org/nthiery/recursive-monkey-patch.svg?branch=master
+    :target: https://travis-ci.org/nthiery/recursive-monkey-patch
+
 Motivating use case
 -------------------
 
