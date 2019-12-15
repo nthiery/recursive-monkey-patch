@@ -1,0 +1,5 @@
+include COPYING
+include README.rst
+recursive-include a_test_module *.py
+recursive-include a_test_module_patch *.py
+recursive-include a_test_module_patch2 *.py
